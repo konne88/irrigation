@@ -1,4 +1,8 @@
 #include <limits>
+#include <WiFi.h>
+#include <time.h>
+
+#include "arduino_secrets.h"
 
 const int MOISTURE_PIN_A = A7;
 const int MOISTURE_PIN_READ = A6;
@@ -17,9 +21,7 @@ void IRAM_ATTR onFlowPulse() {
   ++flowPulseCount;
 }
 
-void setup() {
-  Serial.begin(9600);
-
+void setup_pins() {
   pinMode(FLOW_PIN, INPUT);
   attachInterrupt(digitalPinToInterrupt(FLOW_PIN),
                   onFlowPulse, FALLING);
@@ -31,13 +33,36 @@ void setup() {
   analogReadResolution(12);  // 12 bit read resolution
 }
 
+void connect_wifi() {
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  Serial.print("Connecting to Wi-Fi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.print(".");
+  }
+  Serial.println();
+  Serial.println(WiFi.localIP());
+}
+
+void setup_ntp() {
+  // Configure NTP and Pacific timezone
+  configTzTime("PST8PDT,M3.2.0,M11.1.0", "pool.ntp.org");
+}
+
+void setup() {
+  Serial.begin(9600);
+  setup_pins();
+  connect_wifi();
+  setup_ntp();
+}
+
 // Returns the moisture resistance in ohm.
 long read_moisture() {
+  // Connect electrodes to perform measurement.
   // A --> [moisture] --> READ --> [ MOISTURE_FIXED_RESISTANCE ] --> B
   digitalWrite(MOISTURE_PIN_A, HIGH); 
   digitalWrite(MOISTURE_PIN_B, LOW);
-
-  // Connect electrodes to perform measurement.
   pinMode(MOISTURE_PIN_A, OUTPUT);
   pinMode(MOISTURE_PIN_B, OUTPUT);
   delay(1);
@@ -48,7 +73,7 @@ long read_moisture() {
   digitalWrite(MOISTURE_PIN_B, HIGH);
   delay(1);
 
-  // Disconnect electrodes between measurements.
+  // Disconnect electrodes after measurement.
   pinMode(MOISTURE_PIN_A, INPUT);
   pinMode(MOISTURE_PIN_B, INPUT);
 
