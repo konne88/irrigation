@@ -2,14 +2,11 @@
 #include <WiFi.h>
 #include <time.h>
 #include <array>
+#include <string>
 
 #include "arduino_secrets.h"
-
-void setup() {
-  Serial.begin(9600);
-  setup_network();
-  setup_hardware();
-}
+#include "hardware.h"
+#include "network.h"
 
 std::array<bool, ZONES> control(const tm& time, long moisture, long flow) {
   std::array<bool, ZONES> active_zones = {};   // All false
@@ -20,21 +17,17 @@ std::array<bool, ZONES> control(const tm& time, long moisture, long flow) {
   return active_zones;
 }
 
-struct state {
-  std::array<bool, ZONES> overrides; 
-  std::string control;
+void setup() {
+  Serial.begin(9600);
+  setup_network();
+  setup_hardware();
 }
 
 void loop() {
   tm time;
   getLocalTime(&time); 
-  std::array<bool, ZONES> active_zones = control(time, moisture, flow);
-
-  for (int i = 0; i < ZONES; ++i) {
-    if (i > 0) Serial.print(", ");
-    Serial.print(active_zones[i] ? 1 : 0);
-    digitalWrite(ZONE_PINS[i], active_zones[i] ? HIGH : LOW);
-  }
-  Serial.println();
+  sensor_data sensors = read_sensors();
+  std::array<bool, ZONES> active_zones = control(time, sensors.moisture, sensors.flow);
+  activate_zones(active_zones);
   delay(1000);
 }

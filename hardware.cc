@@ -1,3 +1,6 @@
+#include "hardware.h"
+#include <climits>
+
 const int MOISTURE_PIN_A = A7;
 const int MOISTURE_PIN_READ = A6;
 const int MOISTURE_PIN_B = A5;
@@ -5,7 +8,6 @@ const long MOISTURE_FIXED_RESISTANCE = 10000; // in ohm
 
 const int FLOW_PIN = D10;
 
-const int ZONES = 8;
 const int ZONE_PINS[] = {
   D2, D3, D4, D5, D6, D7, D8, D9
 };
@@ -73,12 +75,10 @@ long read_flow() {
 }
 
 sensor_data read_sensors() {
-  long moisture = read_moisture();
-
   return {
-    .moisture = moisture
-  }
+    read_moisture(),
+    read_flow()
+  };
 }
 
-
-
+void activate_zones(Array<bool, ZONES> active_zones);
