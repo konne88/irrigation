@@ -1,17 +1,23 @@
-#pragma once
+#ifndef IRRIGATION_HARDWARE_H_
+#define IRRIGATION_HARDWARE_H_
 
-#include <Arduino.h>
 #include <array>
 
-const int ZONES = 8;
+namespace irrigation {
 
-void setup_hardware();
+inline constexpr int kZones = 8;
 
-struct sensor_data {
-    long moisture;  // in ohm
-    long flow;
+void SetupHardware();
+
+struct SensorData {
+  long moisture;  // In ohms.
+  long flow;
 };
 
-sensor_data read_sensors();
+SensorData ReadSensors();
 
-void activate_zones(std::array<bool, ZONES> active_zones);
+void ActivateZones(std::array<bool, kZones> active_zones);
+
+}  // namespace irrigation
+
+#endif  // IRRIGATION_HARDWARE_H_

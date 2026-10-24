@@ -1,78 +1,93 @@
 #include "http.h"
 
+#include <array>
+#include <optional>
+#include <string>
+
+#include <Arduino.h>
 #include <ArduinoJson.h>  // ArduinoJson 7
 #include <WebServer.h>
 
+#include "hardware.h"
+#include "state.h"
 #include "website.h"
 
+namespace irrigation {
 namespace {
-WebServer server(80);
-http_state state;
 
-void send_state() {
+WebServer server(80);
+
+void SendState(const State& state) {
   JsonDocument document;
-  JsonArray zones = document["active_zones"].to<JsonArray>();
-  for (const auto& mode : state.active_zones) {
-    if (mode.has_value()) zones.add(*mode);
-    else zones.add(nullptr);
+  JsonArray zones = document["zone_overrides"].to<JsonArray>();
+  for (const auto& mode : state.zone_overrides) {
+    if (mode.has_value()) {
+      zones.add(*mode);
+    } else {
+      zones.add(nullptr);
+    }
   }
-  document["control_program"] = state.control_program;
+  document["control_program"] = state.control_program.c_str();
   String body;
   serializeJson(document, body);
   server.sendHeader("Cache-Control", "no-store");
   server.send(200, "application/json", body);
 }
 
-void set_state() {
+void SetState(State& state) {
   JsonDocument document;
   if (deserializeJson(document, server.arg("plain")) ||
       !document.is<JsonObject>()) {
-    server.send(400, "application/json", "{\"error\":\"Expected a JSON object\"}");
+    server.send(400, "application/json",
+                "{\"error\":\"Expected a JSON object\"}");
     return;
   }
   JsonObject object = document.as<JsonObject>();
   if (object.size() != 2 || !object["control_program"].is<String>() ||
-      !object.containsKey("active_zones")) {
+      !object.containsKey("zone_overrides")) {
     server.send(400, "application/json",
-                "{\"error\":\"Expected active_zones and control_program string\"}");
+                "{\"error\":\"Expected zone_overrides and control_program "
+                "string\"}");
     return;
   }
-  JsonVariant zones = object["active_zones"];
-  std::array<std::optional<bool>, ZONES> active_zones = {};
-  if (!zones.is<JsonArray>() || zones.size() != ZONES) {
+  JsonVariant zones = object["zone_overrides"];
+  std::array<std::optional<bool>, kZones> zone_overrides = {};
+  if (!zones.is<JsonArray>() || zones.size() != kZones) {
     server.send(400, "application/json",
-                "{\"error\":\"active_zones must be an array of eight booleans or nulls\"}");
+                "{\"error\":\"zone_overrides must be an array of eight "
+                "booleans or nulls\"}");
     return;
   }
-  for (int i = 0; i < ZONES; ++i) {
+  for (int i = 0; i < kZones; ++i) {
     if (!zones[i].isNull() && !zones[i].is<bool>()) {
       server.send(400, "application/json",
                   "{\"error\":\"Each zone must be a boolean or null\"}");
       return;
     }
     if (!zones[i].isNull()) {
-      active_zones[i] = zones[i].as<bool>();
+      zone_overrides[i] = zones[i].as<bool>();
     }
   }
   // Commit only after the entire request has been validated.
-  state.control_program = object["control_program"].as<String>();
-  state.active_zones = active_zones;
-  send_state();
+  state.control_program = object["control_program"].as<std::string>();
+  state.zone_overrides = zone_overrides;
+  SendState(state);
 }
+
 }  // namespace
 
-void setup_http() {
+void SetupHttp(State& state) {
   server.on("/", HTTP_GET, []() {
-    server.send_P(200, "text/html; charset=utf-8", WEBSITE);
+    server.send_P(200, "text/html; charset=utf-8", kWebsite);
   });
-  server.on("/state", HTTP_GET, send_state);
-  server.on("/state", HTTP_PUT, set_state);
+  server.on("/state", HTTP_GET, [&state]() { SendState(state); });
+  server.on("/state", HTTP_PUT, [&state]() { SetState(state); });
   server.onNotFound([]() {
     server.send(404, "application/json", "{\"error\":\"Not found\"}");
   });
   server.begin();
 }
 
-void handle_http() { server.handleClient(); }
+void HandleHttp() { server.handleClient(); }
 
-const http_state& get_http_state() { return state; }
+}  // namespace irrigation

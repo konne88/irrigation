@@ -1,8 +1,11 @@
-#pragma once
+#ifndef IRRIGATION_WEBSITE_H_
+#define IRRIGATION_WEBSITE_H_
 
 #include <Arduino.h>
 
-const char WEBSITE[] PROGMEM = R"HTML(
+namespace irrigation {
+
+inline const char kWebsite[] PROGMEM = R"HTML(
 <!doctype html>
 <html lang="en">
 <meta charset="utf-8">
@@ -50,7 +53,7 @@ const char WEBSITE[] PROGMEM = R"HTML(
   }
   function display(state) {
     inputs.forEach((input, i) => {
-      input.value = state.active_zones[i] === null ? 'auto' : state.active_zones[i] ? 'on' : 'off';
+      input.value = state.zone_overrides[i] === null ? 'auto' : state.zone_overrides[i] ? 'on' : 'off';
     });
     program.value = state.control_program;
   }
@@ -71,7 +74,7 @@ const char WEBSITE[] PROGMEM = R"HTML(
         method: 'PUT',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
-          active_zones: inputs.map(input => input.value === 'auto' ? null : input.value === 'on'),
+          zone_overrides: inputs.map(input => input.value === 'auto' ? null : input.value === 'on'),
           control_program: program.value
         })
       }));
@@ -83,3 +86,7 @@ const char WEBSITE[] PROGMEM = R"HTML(
 </script>
 </html>
 )HTML";
+
+}  // namespace irrigation
+
+#endif  // IRRIGATION_WEBSITE_H_

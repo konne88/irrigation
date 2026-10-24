@@ -1,88 +1,87 @@
 #include "hardware.h"
+
 #include <climits>
 
-const int MOISTURE_PIN_A = A7;
-const int MOISTURE_PIN_READ = A6;
-const int MOISTURE_PIN_B = A5;
-const long MOISTURE_FIXED_RESISTANCE = 10000; // in ohm
+#include <Arduino.h>
 
-const int FLOW_PIN = D10;
+namespace irrigation {
+namespace {
 
-const int ZONE_PINS[] = {
-  D2, D3, D4, D5, D6, D7, D8, D9
-};
+constexpr int kMoisturePinA = A7;
+constexpr int kMoisturePinRead = A6;
+constexpr int kMoisturePinB = A5;
+constexpr long kMoistureFixedResistance = 10000;  // In ohms.
+constexpr int kFlowPin = D10;
+constexpr int kZonePins[] = {D2, D3, D4, D5, D6, D7, D8, D9};
 
-volatile unsigned long flowPulseCount = 0;
-
-void IRAM_ATTR onFlowPulse() {
-  ++flowPulseCount;
-}
-
-void setup_hardware() {
-  // Setup flow sensor.
-  pinMode(FLOW_PIN, INPUT);
-  attachInterrupt(digitalPinToInterrupt(FLOW_PIN),
-                  onFlowPulse, FALLING);
-  analogReadResolution(12);  // 12 bit read resolution
-
-  // Setup zones.
-  for (int i = 0; i < ZONES; ++i) {
-    digitalWrite(ZONE_PINS[i], LOW); 
-    pinMode(ZONE_PINS[i], OUTPUT);
-  }
-}
-
+volatile unsigned long flow_pulse_count = 0;
 long moisture_last_reading = LONG_MIN;
 long moisture = 0;
 
-// Returns the moisture resistance in ohm.
-long read_moisture() {
-  // Only read every 10 minutes;
+void IRAM_ATTR OnFlowPulse() { ++flow_pulse_count; }
+
+// Returns the moisture resistance in ohms.
+long ReadMoisture() {
+  // Only read every 10 minutes.
   if (millis() - moisture_last_reading > 600000) {
-
     // Connect electrodes to perform measurement.
-    // A --> [moisture] --> READ --> [ MOISTURE_FIXED_RESISTANCE ] --> B
-    digitalWrite(MOISTURE_PIN_A, HIGH); 
-    digitalWrite(MOISTURE_PIN_B, LOW);
-    pinMode(MOISTURE_PIN_A, OUTPUT);
-    pinMode(MOISTURE_PIN_B, OUTPUT);
+    // A --> [moisture] --> READ --> [kMoistureFixedResistance] --> B
+    digitalWrite(kMoisturePinA, HIGH);
+    digitalWrite(kMoisturePinB, LOW);
+    pinMode(kMoisturePinA, OUTPUT);
+    pinMode(kMoisturePinB, OUTPUT);
     delay(1);
-    long voltage = analogReadMilliVolts(MOISTURE_PIN_READ);
+    long voltage = analogReadMilliVolts(kMoisturePinRead);
 
-    // Send voltage in the other direction, to avoid corrosion.
-    digitalWrite(MOISTURE_PIN_A, LOW); 
-    digitalWrite(MOISTURE_PIN_B, HIGH);
+    // Send voltage in the other direction to avoid corrosion.
+    digitalWrite(kMoisturePinA, LOW);
+    digitalWrite(kMoisturePinB, HIGH);
     delay(1);
 
     // Disconnect electrodes after measurement.
-    pinMode(MOISTURE_PIN_A, INPUT);
-    pinMode(MOISTURE_PIN_B, INPUT);
+    pinMode(kMoisturePinA, INPUT);
+    pinMode(kMoisturePinB, INPUT);
 
-    if (voltage == 0) return LONG_MAX;
+    if (voltage == 0) {
+      return LONG_MAX;
+    }
 
-    moisture = (3300 * MOISTURE_FIXED_RESISTANCE / voltage) - MOISTURE_FIXED_RESISTANCE;
+    moisture = (3300 * kMoistureFixedResistance / voltage) -
+               kMoistureFixedResistance;
     moisture_last_reading = millis();
   }
 
   return moisture;
 }
 
-long read_flow() {
+long ReadFlow() {
   noInterrupts();
-  unsigned long count = flowPulseCount;
+  unsigned long count = flow_pulse_count;
   interrupts();
   return count;
 }
 
-sensor_data read_sensors() {
-  return {
-    read_moisture(),
-    read_flow()
-  };
-}
+}  // namespace
 
-void activate_zones(std::array<bool, ZONES> active_zones) {
-  for (int i = 0; i < ZONES; ++i) {
-    digitalWrite(ZONE_PINS[i], active_zones[i] ? HIGH : LOW);
+void SetupHardware() {
+  // Set up the flow sensor.
+  pinMode(kFlowPin, INPUT);
+  attachInterrupt(digitalPinToInterrupt(kFlowPin), OnFlowPulse, FALLING);
+  analogReadResolution(12);  // 12-bit read resolution.
+
+  // Set up the zones.
+  for (int i = 0; i < kZones; ++i) {
+    digitalWrite(kZonePins[i], LOW);
+    pinMode(kZonePins[i], OUTPUT);
   }
 }
+
+SensorData ReadSensors() { return {ReadMoisture(), ReadFlow()}; }
+
+void ActivateZones(std::array<bool, kZones> active_zones) {
+  for (int i = 0; i < kZones; ++i) {
+    digitalWrite(kZonePins[i], active_zones[i] ? HIGH : LOW);
+  }
+}
+
+}  // namespace irrigation

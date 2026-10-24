@@ -1,16 +1,14 @@
-#pragma once
+#ifndef IRRIGATION_HTTP_H_
+#define IRRIGATION_HTTP_H_
 
-#include <Arduino.h>
-#include <array>
-#include <optional>
+#include "state.h"
 
-#include "hardware.h"
+namespace irrigation {
 
-struct http_state {
-  std::array<std::optional<bool>, ZONES> active_zones = {};
-  String control_program;  // Stored only; no interpreter yet.
-};
+// The state must outlive the registered request handlers.
+void SetupHttp(State& state);
+void HandleHttp();
 
-void setup_http();
-void handle_http();
-const http_state& get_http_state();
+}  // namespace irrigation
+
+#endif  // IRRIGATION_HTTP_H_
