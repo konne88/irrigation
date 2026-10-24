@@ -1,4 +1,5 @@
 default_profile: nano_esp32
+default_port: /dev/cu.usbmodemE8F60AD59B282
 
 profiles:
   nano_esp32:

@@ -3,7 +3,6 @@
 #include <array>
 
 #include <Arduino.h>
-#include <WiFi.h>
 
 #include "control.h"
 #include "hardware.h"
@@ -19,9 +18,10 @@ irrigation::State state;
 
 void setup() {
   Serial.begin(9600);
-  irrigation::SetupNetwork();
   irrigation::SetupHardware();
+  irrigation::SetupNetwork();
   irrigation::SetupHttp(state);
+  Serial.println("Irrigation controller ready at http://garden.local");
 }
 
 void loop() {

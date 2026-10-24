@@ -7,7 +7,8 @@
 namespace irrigation {
 namespace {
 
-constexpr int kMoisturePinA = A7;
+// Avoid A7: enabling its HIGH output reset the board with no wiring attached.
+constexpr int kMoisturePinA = A0;
 constexpr int kMoisturePinRead = A6;
 constexpr int kMoisturePinB = A5;
 constexpr long kMoistureFixedResistance = 10000;  // In ohms.

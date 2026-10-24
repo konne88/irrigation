@@ -21,9 +21,15 @@ inline const char kWebsite[] PROGMEM = R"HTML(
 <h1>Garden irrigation</h1>
 <form id="settings">
   <fieldset id="zones"><legend>Zone overrides</legend></fieldset>
-  <label for="override-end">Override end time (your local time)</label>
-  <input id="override-end" type="datetime-local" step="1" required>
-  <p>All overrides end together. Zones then return to the control program.</p>
+  <label for="override-duration">Override duration</label>
+  <select id="override-duration">
+    <option value="5">5 minutes</option>
+    <option value="15" selected>15 minutes</option>
+    <option value="30">30 minutes</option>
+    <option value="60">1 hour</option>
+  </select>
+  <p id="override-status" role="status"></p>
+  <p>Choose a duration, set zones to On or Off, and save. All overrides end together, then zones return to the control program.</p>
   <label for="program">Control program (Lua)</label>
   <textarea id="program" rows="10" spellcheck="false"></textarea>
   <p>Set <code>active_zones[1]</code> through <code>active_zones[8]</code> to
@@ -41,7 +47,8 @@ inline const char kWebsite[] PROGMEM = R"HTML(
 <script>
   const zones = document.getElementById('zones');
   const program = document.getElementById('program');
-  const overrideEnd = document.getElementById('override-end');
+  const overrideDuration = document.getElementById('override-duration');
+  const overrideStatus = document.getElementById('override-status');
   const status = document.getElementById('status');
   const save = document.getElementById('save');
   const reload = document.getElementById('reload');
@@ -63,17 +70,15 @@ inline const char kWebsite[] PROGMEM = R"HTML(
     return state;
   }
   function display(state) {
+    const active = state.zone_overrides_end > Date.now() / 1000 &&
+      state.zone_overrides.some(value => value !== null);
     inputs.forEach((input, i) => {
-      input.value = state.zone_overrides[i] === null ? 'auto' : state.zone_overrides[i] ? 'on' : 'off';
+      input.value = !active || state.zone_overrides[i] === null ? 'auto' : state.zone_overrides[i] ? 'on' : 'off';
     });
     program.value = state.control_program;
-    if (state.zone_overrides_end > 0) {
-      const date = new Date(state.zone_overrides_end * 1000);
-      const pad = value => String(value).padStart(2, '0');
-      overrideEnd.value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-    } else {
-      overrideEnd.value = '';
-    }
+    overrideStatus.textContent = active
+      ? `Current overrides end at ${new Date(state.zone_overrides_end * 1000).toLocaleTimeString()}.`
+      : 'No active overrides.';
   }
   async function load() {
     save.disabled = true;
@@ -86,11 +91,7 @@ inline const char kWebsite[] PROGMEM = R"HTML(
   reload.onclick = load;
   settings.onsubmit = async event => {
     event.preventDefault();
-    const end = new Date(overrideEnd.value).getTime() / 1000;
-    if (!Number.isSafeInteger(end) || end <= Date.now() / 1000) {
-      status.textContent = 'Choose an override end time in the future.';
-      return;
-    }
+    const end = Math.floor(Date.now() / 1000) + Number(overrideDuration.value) * 60;
     save.disabled = reload.disabled = true;
     try {
       display(await request({
