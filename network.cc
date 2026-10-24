@@ -24,9 +24,9 @@ void SetupNetwork() {
   Serial.print("Mac: ");
   Serial.println(WiFi.macAddress());
 
-  // Resolve garden.local to this device on the local network.
-  if (!MDNS.begin("garden")) {
-    Serial.println("Failed to start mDNS; garden.local will be unavailable.");
+  // Resolve gardens.local to this device on the local network.
+  if (!MDNS.begin("gardens")) {
+    Serial.println("Failed to start mDNS; gardens.local will be unavailable.");
   }
 
   // Configure NTP and the Pacific time zone.

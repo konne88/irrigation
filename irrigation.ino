@@ -21,7 +21,7 @@ void setup() {
   irrigation::SetupHardware();
   irrigation::SetupNetwork();
   irrigation::SetupHttp(state);
-  Serial.println("Irrigation controller ready at http://garden.local");
+  Serial.println("Irrigation controller ready at http://gardens.local");
 }
 
 void loop() {
