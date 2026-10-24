@@ -24,8 +24,15 @@ inline const char kWebsite[] PROGMEM = R"HTML(
   <label for="override-end">Override end time (your local time)</label>
   <input id="override-end" type="datetime-local" step="1" required>
   <p>All overrides end together. Zones then return to the control program.</p>
-  <label for="program">Control program (stored only; not executed)</label>
+  <label for="program">Control program (Lua)</label>
   <textarea id="program" rows="10" spellcheck="false"></textarea>
+  <p>Set <code>active_zones[1]</code> through <code>active_zones[8]</code> to
+    <code>true</code> or <code>false</code>. All zones start off on each run.
+    Inputs: <code>moisture</code> (ohms), <code>flow</code> (pulse count),
+    <code>year</code>, <code>month</code>, <code>day</code>, <code>hour</code>,
+    <code>minute</code>, <code>second</code>, <code>weekday</code> (Monday = 0),
+    <code>yearday</code> (January 1 = 1), and <code>isdst</code>.
+    Script errors turn all zones off before overrides are applied.</p>
   <button id="save" disabled>Save state</button>
   <button id="reload" type="button">Reload</button>
 </form>
