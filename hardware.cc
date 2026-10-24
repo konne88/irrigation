@@ -79,10 +79,17 @@ void SetupHardware() {
 
 SensorData ReadSensors() { return {ReadMoisture(), ReadFlow()}; }
 
+std::array<bool, kZones> active_zones_state = {};
+
 void ActivateZones(std::array<bool, kZones> active_zones) {
   for (int i = 0; i < kZones; ++i) {
     digitalWrite(kZonePins[i], active_zones[i] ? HIGH : LOW);
   }
+  active_zones_state = active_zones;
+}
+
+std::array<bool, kZones> GetActiveZones() {
+  return active_zones_state;
 }
 
 }  // namespace irrigation

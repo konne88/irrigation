@@ -18,6 +18,8 @@ SensorData ReadSensors();
 
 void ActivateZones(std::array<bool, kZones> active_zones);
 
+std::array<bool, kZones> GetActiveZones();
+
 }  // namespace irrigation
 
 #endif  // IRRIGATION_HARDWARE_H_

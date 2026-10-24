@@ -19,6 +19,16 @@ namespace {
 
 WebServer server(80);
 
+void SendActiveZones() {
+  JsonDocument document;
+  JsonArray zones = document["active_zones"].to<JsonArray>();
+  for (bool active : GetActiveZones()) zones.add(active);
+  String body;
+  serializeJson(document, body);
+  server.sendHeader("Cache-Control", "no-store");
+  server.send(200, "application/json", body);
+}
+
 void SendSettings(const Settings& settings) {
   JsonDocument document;
   JsonArray zones = document["zone_overrides"].to<JsonArray>();
@@ -102,6 +112,7 @@ void SetupHttp(Settings& settings) {
     server.send_P(200, "text/html; charset=utf-8", kWebsite);
   });
   server.on("/settings", HTTP_GET, [&settings]() { SendSettings(settings); });
+  server.on("/active-zones", HTTP_GET, SendActiveZones);
   server.on("/settings/zone-override", HTTP_PUT,
             [&settings]() { OverrideZone(settings); });
   server.on("/settings/program", HTTP_PUT,
