@@ -25,7 +25,7 @@ void setup() {
 
 void loop() {
   tm time;
-  getLocalTime(&time); 
+  CHECK(getLocalTime(&time));
   sensor_data sensors = read_sensors();
   std::array<bool, ZONES> active_zones = control(time, sensors.moisture, sensors.flow);
   activate_zones(active_zones);
