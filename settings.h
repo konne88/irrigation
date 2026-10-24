@@ -1,5 +1,5 @@
-#ifndef IRRIGATION_STATE_H_
-#define IRRIGATION_STATE_H_
+#ifndef IRRIGATION_SETTINGS_H_
+#define IRRIGATION_SETTINGS_H_
 
 #include <time.h>
 
@@ -11,7 +11,7 @@
 
 namespace irrigation {
 
-struct State {
+struct Settings {
   std::array<std::optional<bool>, kZones> zone_overrides = {};
   time_t zone_overrides_end = 0;  // Unix seconds; zero means inactive.
   std::string control_program =
@@ -23,4 +23,4 @@ struct State {
 
 }  // namespace irrigation
 
-#endif  // IRRIGATION_STATE_H_
+#endif  // IRRIGATION_SETTINGS_H_

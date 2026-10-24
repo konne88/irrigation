@@ -1,12 +1,12 @@
 #ifndef IRRIGATION_HTTP_H_
 #define IRRIGATION_HTTP_H_
 
-#include "state.h"
+#include "settings.h"
 
 namespace irrigation {
 
-// The state must outlive the registered request handlers.
-void SetupHttp(State& state);
+// The settings must outlive the registered request handlers.
+void SetupHttp(Settings& settings);
 void HandleHttp();
 
 }  // namespace irrigation

@@ -13,7 +13,7 @@
 #include <WebServer.h>
 
 #include "hardware.h"
-#include "state.h"
+#include "settings.h"
 #include "website.h"
 
 namespace irrigation {
@@ -21,25 +21,25 @@ namespace {
 
 WebServer server(80);
 
-void SendState(const State& state) {
+void SendSettings(const Settings& settings) {
   JsonDocument document;
   JsonArray zones = document["zone_overrides"].to<JsonArray>();
-  for (const auto& mode : state.zone_overrides) {
+  for (const auto& mode : settings.zone_overrides) {
     if (mode.has_value()) {
       zones.add(*mode);
     } else {
       zones.add(nullptr);
     }
   }
-  document["control_program"] = state.control_program.c_str();
-  document["zone_overrides_end"] = state.zone_overrides_end;
+  document["control_program"] = settings.control_program.c_str();
+  document["zone_overrides_end"] = settings.zone_overrides_end;
   String body;
   serializeJson(document, body);
   server.sendHeader("Cache-Control", "no-store");
   server.send(200, "application/json", body);
 }
 
-void SetState(State& state) {
+void SetSettings(Settings& settings) {
   JsonDocument document;
   if (deserializeJson(document, server.arg("plain")) ||
       !document.is<JsonObject>()) {
@@ -83,20 +83,20 @@ void SetState(State& state) {
     }
   }
   // Commit only after the entire request has been validated.
-  state.control_program = object["control_program"].as<std::string>();
-  state.zone_overrides = zone_overrides;
-  state.zone_overrides_end = static_cast<time_t>(end.as<std::int64_t>());
-  SendState(state);
+  settings.control_program = object["control_program"].as<std::string>();
+  settings.zone_overrides = zone_overrides;
+  settings.zone_overrides_end = static_cast<time_t>(end.as<std::int64_t>());
+  SendSettings(settings);
 }
 
 }  // namespace
 
-void SetupHttp(State& state) {
+void SetupHttp(Settings& settings) {
   server.on("/", HTTP_GET, []() {
     server.send_P(200, "text/html; charset=utf-8", kWebsite);
   });
-  server.on("/state", HTTP_GET, [&state]() { SendState(state); });
-  server.on("/state", HTTP_PUT, [&state]() { SetState(state); });
+  server.on("/settings", HTTP_GET, [&settings]() { SendSettings(settings); });
+  server.on("/settings", HTTP_PUT, [&settings]() { SetSettings(settings); });
   server.onNotFound([]() {
     server.send(404, "application/json", "{\"error\":\"Not found\"}");
   });

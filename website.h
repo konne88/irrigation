@@ -60,7 +60,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}legend{padding:0}#zones{display
   const overrideStatus = document.getElementById('override-status');
   const status = document.getElementById('status');
   const save = document.getElementById('save');
-  const settings = document.getElementById('settings');
+  const settingsForm = document.getElementById('settings');
   let busy = false;
   let loaded = false;
   const inputs = Array.from({length: 8}, (_, i) => {
@@ -102,24 +102,24 @@ fieldset{border:0;padding:0;margin:0;min-width:0}legend{padding:0}#zones{display
       : `Manual override · ${input.value}${pending ? ' · applying' : ''}`;
   }
   async function request(options) {
-    const response = await fetch('/state', {cache: 'no-store', ...options});
-    const state = await response.json();
-    if (!response.ok) throw new Error(state.error || 'Request failed');
-    return state;
+    const response = await fetch('/settings', {cache: 'no-store', ...options});
+    const settings = await response.json();
+    if (!response.ok) throw new Error(settings.error || 'Request failed');
+    return settings;
   }
-  function display(state, updateProgram = true) {
-    const active = state.zone_overrides_end > Date.now() / 1000 &&
-      state.zone_overrides.some(value => value !== null);
+  function display(settings, updateProgram = true) {
+    const active = settings.zone_overrides_end > Date.now() / 1000 &&
+      settings.zone_overrides.some(value => value !== null);
     inputs.forEach((input, i) => {
-      input.value = !active || state.zone_overrides[i] === null ? 'auto' : state.zone_overrides[i] ? 'on' : 'off';
+      input.value = !active || settings.zone_overrides[i] === null ? 'auto' : settings.zone_overrides[i] ? 'on' : 'off';
       input.disabled = false;
       updateZone(input, false);
     });
-    if (updateProgram) program.value = state.control_program;
+    if (updateProgram) program.value = settings.control_program;
     program.disabled = false;
     connection(true);
     overrideStatus.textContent = active
-      ? `Current overrides end at ${new Date(state.zone_overrides_end * 1000).toLocaleTimeString()}.`
+      ? `Current overrides end at ${new Date(settings.zone_overrides_end * 1000).toLocaleTimeString()}.`
       : 'No active overrides.';
   }
   function setBusy(value) {
@@ -141,11 +141,11 @@ fieldset{border:0;padding:0;margin:0;min-width:0}legend{padding:0}#zones{display
       connection(false);
     } finally { setBusy(false); }
   }
-  async function writeState(state) {
+  async function writeSettings(settings) {
     return request({
       method: 'PUT',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(state)
+      body: JSON.stringify(settings)
     });
   }
   async function applyZone(index, mode) {
@@ -154,14 +154,14 @@ fieldset{border:0;padding:0;margin:0;min-width:0}legend{padding:0}#zones{display
     status.textContent = `Applying Zone ${index + 1}...`;
     try {
       // Fetch current settings so this click cannot save a draft program or stale overrides.
-      const state = await request();
+      const settings = await request();
       const now = Math.floor(Date.now() / 1000);
-      if (state.zone_overrides_end <= now) state.zone_overrides.fill(null);
-      state.zone_overrides[index] = mode === 'auto' ? null : mode === 'on';
-      if (mode !== 'auto' || state.zone_overrides_end <= now) {
-        state.zone_overrides_end = now + Number(overrideDuration.value) * 60;
+      if (settings.zone_overrides_end <= now) settings.zone_overrides.fill(null);
+      settings.zone_overrides[index] = mode === 'auto' ? null : mode === 'on';
+      if (mode !== 'auto' || settings.zone_overrides_end <= now) {
+        settings.zone_overrides_end = now + Number(overrideDuration.value) * 60;
       }
-      display(await writeState(state), false);
+      display(await writeSettings(settings), false);
       status.textContent = `Zone ${index + 1}: ${mode === 'auto' ? 'Auto' : mode === 'on' ? 'On' : 'Off'} applied.`;
     } catch (error) {
       loaded = false;
@@ -169,17 +169,17 @@ fieldset{border:0;padding:0;margin:0;min-width:0}legend{padding:0}#zones{display
       status.textContent = `Change not confirmed: ${error.message}. Refresh the page to check.`;
     } finally { setBusy(false); }
   }
-  settings.onsubmit = async event => {
+  settingsForm.onsubmit = async event => {
     event.preventDefault();
     if (busy || !loaded) return;
     setBusy(true);
     try {
-      const state = await request();
-      state.control_program = program.value;
-      if (state.zone_overrides_end <= 0) {
-        state.zone_overrides_end = Math.floor(Date.now() / 1000) + 1;
+      const settings = await request();
+      settings.control_program = program.value;
+      if (settings.zone_overrides_end <= 0) {
+        settings.zone_overrides_end = Math.floor(Date.now() / 1000) + 1;
       }
-      display(await writeState(state));
+      display(await writeSettings(settings));
       status.textContent = 'Program saved.';
     } catch (error) {
       loaded = false;
