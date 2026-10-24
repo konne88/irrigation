@@ -81,4 +81,8 @@ sensor_data read_sensors() {
   };
 }
 
-void activate_zones(Array<bool, ZONES> active_zones);
+void activate_zones(std::array<bool, ZONES> active_zones) {
+  for (int i = 0; i < ZONES; ++i) {
+    digitalWrite(ZONE_PINS[i], active_zones[i] ? HIGH : LOW);
+  }
+}

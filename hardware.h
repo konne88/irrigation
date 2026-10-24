@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <array>
 
 const int ZONES = 8;
 
@@ -13,4 +14,4 @@ struct sensor_data {
 
 sensor_data read_sensors();
 
-void activate_zones(Array<bool, ZONES> active_zones);
+void activate_zones(std::array<bool, ZONES> active_zones);
