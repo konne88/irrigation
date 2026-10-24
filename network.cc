@@ -7,7 +7,6 @@
 #include <WiFi.h>
 
 #include "arduino_secrets.h"
-#include "util.h"
 
 namespace irrigation {
 
@@ -26,7 +25,9 @@ void SetupNetwork() {
   Serial.println(WiFi.macAddress());
 
   // Resolve garden.local to this device on the local network.
-  IRRIGATION_CHECK(MDNS.begin("garden"));
+  if (!MDNS.begin("garden")) {
+    Serial.println("Failed to start mDNS; garden.local will be unavailable.");
+  }
 
   // Configure NTP and the Pacific time zone.
   configTzTime("PST8PDT,M3.2.0,M11.1.0", "pool.ntp.org");

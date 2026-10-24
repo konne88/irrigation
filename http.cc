@@ -1,6 +1,10 @@
 #include "http.h"
 
+#include <time.h>
+
 #include <array>
+#include <cstdint>
+#include <limits>
 #include <optional>
 #include <string>
 
@@ -28,6 +32,7 @@ void SendState(const State& state) {
     }
   }
   document["control_program"] = state.control_program.c_str();
+  document["zone_overrides_end"] = state.zone_overrides_end;
   String body;
   serializeJson(document, body);
   server.sendHeader("Cache-Control", "no-store");
@@ -43,11 +48,20 @@ void SetState(State& state) {
     return;
   }
   JsonObject object = document.as<JsonObject>();
-  if (object.size() != 2 || !object["control_program"].is<String>() ||
+  if (object.size() != 3 || !object["control_program"].is<String>() ||
+      !object.containsKey("zone_overrides_end") ||
       !object.containsKey("zone_overrides")) {
     server.send(400, "application/json",
-                "{\"error\":\"Expected zone_overrides and control_program "
-                "string\"}");
+                "{\"error\":\"Expected zone_overrides, zone_overrides_end, "
+                "and control_program string\"}");
+    return;
+  }
+  JsonVariant end = object["zone_overrides_end"];
+  if (!end.is<std::int64_t>() || end.as<std::int64_t>() <= 0 ||
+      end.as<std::int64_t>() > std::numeric_limits<time_t>::max()) {
+    server.send(400, "application/json",
+                "{\"error\":\"zone_overrides_end must be a positive Unix "
+                "timestamp in seconds within the controller's time range\"}");
     return;
   }
   JsonVariant zones = object["zone_overrides"];
@@ -71,6 +85,7 @@ void SetState(State& state) {
   // Commit only after the entire request has been validated.
   state.control_program = object["control_program"].as<std::string>();
   state.zone_overrides = zone_overrides;
+  state.zone_overrides_end = static_cast<time_t>(end.as<std::int64_t>());
   SendState(state);
 }
 

@@ -21,6 +21,9 @@ inline const char kWebsite[] PROGMEM = R"HTML(
 <h1>Garden irrigation</h1>
 <form id="settings">
   <fieldset id="zones"><legend>Zone overrides</legend></fieldset>
+  <label for="override-end">Override end time (your local time)</label>
+  <input id="override-end" type="datetime-local" step="1" required>
+  <p>All overrides end together. Zones then return to the control program.</p>
   <label for="program">Control program (stored only; not executed)</label>
   <textarea id="program" rows="10" spellcheck="false"></textarea>
   <button id="save" disabled>Save state</button>
@@ -31,6 +34,7 @@ inline const char kWebsite[] PROGMEM = R"HTML(
 <script>
   const zones = document.getElementById('zones');
   const program = document.getElementById('program');
+  const overrideEnd = document.getElementById('override-end');
   const status = document.getElementById('status');
   const save = document.getElementById('save');
   const reload = document.getElementById('reload');
@@ -56,6 +60,13 @@ inline const char kWebsite[] PROGMEM = R"HTML(
       input.value = state.zone_overrides[i] === null ? 'auto' : state.zone_overrides[i] ? 'on' : 'off';
     });
     program.value = state.control_program;
+    if (state.zone_overrides_end > 0) {
+      const date = new Date(state.zone_overrides_end * 1000);
+      const pad = value => String(value).padStart(2, '0');
+      overrideEnd.value = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    } else {
+      overrideEnd.value = '';
+    }
   }
   async function load() {
     save.disabled = true;
@@ -68,6 +79,11 @@ inline const char kWebsite[] PROGMEM = R"HTML(
   reload.onclick = load;
   settings.onsubmit = async event => {
     event.preventDefault();
+    const end = new Date(overrideEnd.value).getTime() / 1000;
+    if (!Number.isSafeInteger(end) || end <= Date.now() / 1000) {
+      status.textContent = 'Choose an override end time in the future.';
+      return;
+    }
     save.disabled = reload.disabled = true;
     try {
       display(await request({
@@ -75,6 +91,7 @@ inline const char kWebsite[] PROGMEM = R"HTML(
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           zone_overrides: inputs.map(input => input.value === 'auto' ? null : input.value === 'on'),
+          zone_overrides_end: end,
           control_program: program.value
         })
       }));

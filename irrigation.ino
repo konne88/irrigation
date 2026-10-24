@@ -41,9 +41,11 @@ void loop() {
   std::array<bool, irrigation::kZones> active_zones = {};
   if (time_available) {
     active_zones = Control(time, sensors.moisture, sensors.flow);
-  }
-  for (int i = 0; i < irrigation::kZones; ++i) {
-    active_zones[i] = state.zone_overrides[i].value_or(active_zones[i]);
+    if (::time(nullptr) < state.zone_overrides_end) {
+      for (int i = 0; i < irrigation::kZones; ++i) {
+        active_zones[i] = state.zone_overrides[i].value_or(active_zones[i]);
+      }
+    }
   }
   irrigation::ActivateZones(active_zones);
   delay(10);
