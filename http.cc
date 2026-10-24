@@ -2,10 +2,8 @@
 
 #include <time.h>
 
-#include <array>
 #include <cstdint>
 #include <limits>
-#include <optional>
 #include <string>
 
 #include <Arduino.h>
@@ -39,53 +37,61 @@ void SendSettings(const Settings& settings) {
   server.send(200, "application/json", body);
 }
 
-void SetSettings(Settings& settings) {
-  JsonDocument document;
+bool ReadObject(JsonDocument& document) {
   if (deserializeJson(document, server.arg("plain")) ||
       !document.is<JsonObject>()) {
     server.send(400, "application/json",
                 "{\"error\":\"Expected a JSON object\"}");
-    return;
+    return false;
   }
+  return true;
+}
+
+void OverrideZone(Settings& settings) {
+  JsonDocument document;
+  if (!ReadObject(document)) return;
   JsonObject object = document.as<JsonObject>();
-  if (object.size() != 3 || !object["control_program"].is<String>() ||
-      !object.containsKey("zone_overrides_end") ||
-      !object.containsKey("zone_overrides")) {
+  if (object.size() != 3 || !object["zone"].is<int>() ||
+      object["zone"].as<int>() < 1 || object["zone"].as<int>() > kZones ||
+      !object.containsKey("override") ||
+      (!object["override"].isNull() && !object["override"].is<bool>())) {
     server.send(400, "application/json",
-                "{\"error\":\"Expected zone_overrides, zone_overrides_end, "
-                "and control_program string\"}");
+                "{\"error\":\"Expected zone (1-8), override (boolean or null), "
+                "and zone_overrides_end\"}");
     return;
   }
   JsonVariant end = object["zone_overrides_end"];
-  if (!end.is<std::int64_t>() || end.as<std::int64_t>() <= 0 ||
+  const time_t now = time(nullptr);
+  if (!end.is<std::int64_t>() || end.as<std::int64_t>() <= now ||
+      end.as<std::int64_t>() <= 0 ||
       end.as<std::int64_t>() > std::numeric_limits<time_t>::max()) {
     server.send(400, "application/json",
-                "{\"error\":\"zone_overrides_end must be a positive Unix "
-                "timestamp in seconds within the controller's time range\"}");
+                "{\"error\":\"zone_overrides_end must be a future Unix "
+                "timestamp within the controller's time range\"}");
     return;
   }
-  JsonVariant zones = object["zone_overrides"];
-  std::array<std::optional<bool>, kZones> zone_overrides = {};
-  if (!zones.is<JsonArray>() || zones.size() != kZones) {
-    server.send(400, "application/json",
-                "{\"error\":\"zone_overrides must be an array of eight "
-                "booleans or nulls\"}");
-    return;
+  // Expired overrides must not become active again when the timeout changes.
+  if (settings.zone_overrides_end <= now) settings.zone_overrides = {};
+  const int zone = object["zone"].as<int>() - 1;
+  if (object["override"].isNull()) {
+    settings.zone_overrides[zone].reset();
+  } else {
+    settings.zone_overrides[zone] = object["override"].as<bool>();
   }
-  for (int i = 0; i < kZones; ++i) {
-    if (!zones[i].isNull() && !zones[i].is<bool>()) {
-      server.send(400, "application/json",
-                  "{\"error\":\"Each zone must be a boolean or null\"}");
-      return;
-    }
-    if (!zones[i].isNull()) {
-      zone_overrides[i] = zones[i].as<bool>();
-    }
-  }
-  // Commit only after the entire request has been validated.
-  settings.control_program = object["control_program"].as<std::string>();
-  settings.zone_overrides = zone_overrides;
   settings.zone_overrides_end = static_cast<time_t>(end.as<std::int64_t>());
+  SendSettings(settings);
+}
+
+void SetProgram(Settings& settings) {
+  JsonDocument document;
+  if (!ReadObject(document)) return;
+  JsonObject object = document.as<JsonObject>();
+  if (object.size() != 1 || !object["control_program"].is<String>()) {
+    server.send(400, "application/json",
+                "{\"error\":\"Expected control_program string\"}");
+    return;
+  }
+  settings.control_program = object["control_program"].as<std::string>();
   SendSettings(settings);
 }
 
@@ -96,7 +102,10 @@ void SetupHttp(Settings& settings) {
     server.send_P(200, "text/html; charset=utf-8", kWebsite);
   });
   server.on("/settings", HTTP_GET, [&settings]() { SendSettings(settings); });
-  server.on("/settings", HTTP_PUT, [&settings]() { SetSettings(settings); });
+  server.on("/settings/zone-override", HTTP_PUT,
+            [&settings]() { OverrideZone(settings); });
+  server.on("/settings/program", HTTP_PUT,
+            [&settings]() { SetProgram(settings); });
   server.onNotFound([]() {
     server.send(404, "application/json", "{\"error\":\"Not found\"}");
   });

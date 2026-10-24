@@ -34,7 +34,7 @@ fieldset{border:0;padding:0;margin:0;min-width:0}legend{padding:0}#zones{display
   <div class="section-head"><div><h2>Watering zones</h2><p>Follow your watering program, or take the reins for a while.</p></div><span class="pill">8 zones</span></div>
   <div class="duration"><label for="override-duration">Manual override duration</label><select id="override-duration"><option value="5">5 minutes</option><option value="15" selected>15 minutes</option><option value="30">30 minutes</option><option value="60">1 hour</option></select></div>
   <fieldset id="zones"><legend class="sr-only">Zone overrides</legend></fieldset>
-  <p class="footnote">Changes apply immediately. On and Off start the selected duration for all current overrides; Auto returns that zone to your watering program.</p>
+  <p class="footnote">Changes apply immediately. Each click starts the selected duration for all current overrides; Auto returns that zone to your watering program.</p>
   <p id="override-status" class="footnote" role="status"></p>
   <section class="program" aria-labelledby="program-title">
     <div class="section-head"><div><h2 id="program-title">Your watering program</h2><p>A little logic to keep your gardens growing.</p></div><span class="pill">Lua</span></div>
@@ -101,8 +101,8 @@ fieldset{border:0;padding:0;margin:0;min-width:0}legend{padding:0}#zones{display
       ? 'Following your program'
       : `Manual override · ${input.value}${pending ? ' · applying' : ''}`;
   }
-  async function request(options) {
-    const response = await fetch('/settings', {cache: 'no-store', ...options});
+  async function request(path = '/settings', options) {
+    const response = await fetch(path, {cache: 'no-store', ...options});
     const settings = await response.json();
     if (!response.ok) throw new Error(settings.error || 'Request failed');
     return settings;
@@ -141,11 +141,11 @@ fieldset{border:0;padding:0;margin:0;min-width:0}legend{padding:0}#zones{display
       connection(false);
     } finally { setBusy(false); }
   }
-  async function writeSettings(settings) {
-    return request({
+  async function writeSettings(path, update) {
+    return request(path, {
       method: 'PUT',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify(settings)
+      body: JSON.stringify(update)
     });
   }
   async function applyZone(index, mode) {
@@ -153,15 +153,11 @@ fieldset{border:0;padding:0;margin:0;min-width:0}legend{padding:0}#zones{display
     setBusy(true);
     status.textContent = `Applying Zone ${index + 1}...`;
     try {
-      // Fetch current settings so this click cannot save a draft program or stale overrides.
-      const settings = await request();
-      const now = Math.floor(Date.now() / 1000);
-      if (settings.zone_overrides_end <= now) settings.zone_overrides.fill(null);
-      settings.zone_overrides[index] = mode === 'auto' ? null : mode === 'on';
-      if (mode !== 'auto' || settings.zone_overrides_end <= now) {
-        settings.zone_overrides_end = now + Number(overrideDuration.value) * 60;
-      }
-      display(await writeSettings(settings), false);
+      display(await writeSettings('/settings/zone-override', {
+        zone: index + 1,
+        override: mode === 'auto' ? null : mode === 'on',
+        zone_overrides_end: Math.floor(Date.now() / 1000) + Number(overrideDuration.value) * 60
+      }), false);
       status.textContent = `Zone ${index + 1}: ${mode === 'auto' ? 'Auto' : mode === 'on' ? 'On' : 'Off'} applied.`;
     } catch (error) {
       loaded = false;
@@ -174,12 +170,9 @@ fieldset{border:0;padding:0;margin:0;min-width:0}legend{padding:0}#zones{display
     if (busy || !loaded) return;
     setBusy(true);
     try {
-      const settings = await request();
-      settings.control_program = program.value;
-      if (settings.zone_overrides_end <= 0) {
-        settings.zone_overrides_end = Math.floor(Date.now() / 1000) + 1;
-      }
-      display(await writeSettings(settings));
+      display(await writeSettings('/settings/program', {
+        control_program: program.value
+      }));
       status.textContent = 'Program saved.';
     } catch (error) {
       loaded = false;
