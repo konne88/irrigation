@@ -5,99 +5,10 @@
 
 #include "arduino_secrets.h"
 
-const int MOISTURE_PIN_A = A7;
-const int MOISTURE_PIN_READ = A6;
-const int MOISTURE_PIN_B = A5;
-const long MOISTURE_FIXED_RESISTANCE = 10000; // in ohm
-
-const int ZONES = 8;
-const int ZONE_PINS[] = {
-  D2, D3, D4, D5, D6, D7, D8, D9
-};
-const int FLOW_PIN = D10;
-
-volatile unsigned long flowPulseCount = 0;
-
-void IRAM_ATTR onFlowPulse() {
-  ++flowPulseCount;
-}
-
-void setup_pins() {
-  pinMode(FLOW_PIN, INPUT);
-  attachInterrupt(digitalPinToInterrupt(FLOW_PIN),
-                  onFlowPulse, FALLING);
-
-  for (int i = 0; i < ZONES; ++i) {
-    digitalWrite(ZONE_PINS[i], LOW); 
-    pinMode(ZONE_PINS[i], OUTPUT);
-  }
-  analogReadResolution(12);  // 12 bit read resolution
-}
-
-void connect_wifi() {
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  Serial.print("Connecting to Wi-Fi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(1000);
-    Serial.print(".");
-  }
-  Serial.println();
-  Serial.println(WiFi.localIP());
-}
-
-void setup_ntp() {
-  // Configure NTP and Pacific timezone
-  configTzTime("PST8PDT,M3.2.0,M11.1.0", "pool.ntp.org");
-}
-
 void setup() {
   Serial.begin(9600);
-  setup_pins();
-  connect_wifi();
-  setup_ntp();
-}
-
-long moisture_last_reading = LONG_MIN;
-long moisture = 0;
-
-// Returns the moisture resistance in ohm.
-long read_moisture() {
-  // Only read every 10 minutes;
-  if (millis() - moisture_last_reading > 600000) {
-
-    // Connect electrodes to perform measurement.
-    // A --> [moisture] --> READ --> [ MOISTURE_FIXED_RESISTANCE ] --> B
-    digitalWrite(MOISTURE_PIN_A, HIGH); 
-    digitalWrite(MOISTURE_PIN_B, LOW);
-    pinMode(MOISTURE_PIN_A, OUTPUT);
-    pinMode(MOISTURE_PIN_B, OUTPUT);
-    delay(1);
-    long voltage = analogReadMilliVolts(MOISTURE_PIN_READ);
-
-    // Send voltage in the other direction, to avoid corrosion.
-    digitalWrite(MOISTURE_PIN_A, LOW); 
-    digitalWrite(MOISTURE_PIN_B, HIGH);
-    delay(1);
-
-    // Disconnect electrodes after measurement.
-    pinMode(MOISTURE_PIN_A, INPUT);
-    pinMode(MOISTURE_PIN_B, INPUT);
-
-    if (voltage == 0) return LONG_MAX;
-
-    moisture = (3300 * MOISTURE_FIXED_RESISTANCE / voltage) - MOISTURE_FIXED_RESISTANCE;
-    moisture_last_reading = millis();
-  }
-
-  return moisture;
-}
-
-long read_flow() {
-  noInterrupts();
-  unsigned long count = flowPulseCount;
-  interrupts();
-  return count;
+  setup_network();
+  setup_hardware();
 }
 
 std::array<bool, ZONES> control(const tm& time, long moisture, long flow) {
@@ -109,31 +20,21 @@ std::array<bool, ZONES> control(const tm& time, long moisture, long flow) {
   return active_zones;
 }
 
-void loop() {
-  long moisture = read_moisture();
-  Serial.print("moisture ");
-  Serial.println(moisture);
+struct state {
+  std::array<bool, ZONES> overrides; 
+  std::string control;
+}
 
-  long flow = read_flow();
-  Serial.print("flow ");
-  Serial.println(flow);
-  
-  // Turn of all zones, if anything fails.
-  std::array<bool, ZONES> active_zones = {};
+void loop() {
   tm time;
-  if (!getLocalTime(&time)) {
-    Serial.println("Failed to get time");
-  } else {
-    active_zones = control(time, moisture, flow);
-  }
-  Serial.print("Active zones: ");
+  getLocalTime(&time); 
+  std::array<bool, ZONES> active_zones = control(time, moisture, flow);
+
   for (int i = 0; i < ZONES; ++i) {
     if (i > 0) Serial.print(", ");
     Serial.print(active_zones[i] ? 1 : 0);
-    digitalWrite(ZONE_PINS[i], active_zones[i] ? HIGH : LOW); 
+    digitalWrite(ZONE_PINS[i], active_zones[i] ? HIGH : LOW);
   }
   Serial.println();
-
   delay(1000);
 }
-
