@@ -6,8 +6,12 @@
 #include <cstdio>
 #include <string>
 
+extern "C" {
+#include <lauxlib.h>
+#include <lua.h>
+}
+
 #include "hardware.h"
-#include "src/lua/lua.hpp"
 
 namespace irrigation {
 namespace {
@@ -47,15 +51,15 @@ int RunControl(lua_State* lua) {
   }
   lua_setglobal(lua, "active_zones");
 
-  if (luaL_loadbufferx(lua, context.program.data(), context.program.size(),
-                       "control", "t") != LUA_OK) {
+  if (luaL_loadbuffer(lua, context.program.data(), context.program.size(),
+                      "control") != LUA_OK) {
     return lua_error(lua);
   }
   lua_call(lua, 0, 0);
 
   lua_getglobal(lua, "active_zones");
   luaL_checktype(lua, -1, LUA_TTABLE);
-  if (lua_rawlen(lua, -1) != kZones) {
+  if (lua_objlen(lua, -1) != kZones) {
     return luaL_error(lua, "active_zones must have eight entries");
   }
   for (int i = 0; i < kZones; ++i) {
