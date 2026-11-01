@@ -8,10 +8,13 @@ namespace irrigation {
 namespace {
 
 // Avoid A7: enabling its HIGH output reset the board with no wiring attached.
-constexpr int kMoisturePinA = A0;
-constexpr int kMoisturePinRead = A6;
+constexpr int kMoisturePinA = A3;
+constexpr int kMoisturePinRead = A4;
 constexpr int kMoisturePinB = A5;
 constexpr long kMoistureFixedResistance = 10000;  // In ohms.
+constexpr long kMoistureProtectionResistance = 1000;  // In ohms.
+constexpr long kMoistureTimeDelta = 600000;  // 10min, in milliseconds.
+
 constexpr int kFlowPin = D10;
 constexpr int kZonePins[] = {D2, D3, D4, D5, D6, D7, D8, D9};
 
@@ -24,9 +27,9 @@ void IRAM_ATTR OnFlowPulse() { ++flow_pulse_count; }
 // Returns the moisture resistance in ohms.
 long ReadMoisture() {
   // Only read every 10 minutes.
-  if (millis() - moisture_last_reading > 600000) {
+  if (millis() - moisture_last_reading > kMoistureTimeDelta) {
     // Connect electrodes to perform measurement.
-    // A --> [moisture] --> READ --> [kMoistureFixedResistance] --> B
+    // A --> [kMoistureProtectionResistance] --> [moisture] --> READ --> [kMoistureFixedResistance] --> B
     digitalWrite(kMoisturePinA, HIGH);
     digitalWrite(kMoisturePinB, LOW);
     pinMode(kMoisturePinA, OUTPUT);
@@ -48,7 +51,7 @@ long ReadMoisture() {
     }
 
     moisture = (3300 * kMoistureFixedResistance / voltage) -
-               kMoistureFixedResistance;
+               kMoistureFixedResistance - kMoistureProtectionResistance;
     moisture_last_reading = millis();
   }
 

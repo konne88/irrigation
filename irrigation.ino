@@ -29,6 +29,10 @@ void loop() {
   tm time = {};
   bool time_available = getLocalTime(&time, 10);
   irrigation::SensorData sensors = irrigation::ReadSensors();
+
+  Serial.print("Moisture: ");
+  Serial.println(sensors.moisture);
+
   std::array<bool, irrigation::kZones> active_zones = {};
   if (time_available) {
     active_zones = irrigation::Control(settings.control_program, time,
