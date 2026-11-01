@@ -26,6 +26,12 @@ void IRAM_ATTR OnFlowPulse() { ++flow_pulse_count; }
 
 // Returns the moisture resistance in ohms.
 long ReadMoisture() {
+  // Zones share wiring with the electrodes. Keep them disconnected while any
+  // zone is on to avoid unsafe inductive currents; retain the last reading.
+  for (bool active : GetActiveZones()) {
+    if (active) return moisture;
+  }
+
   // Only read every 10 minutes.
   if (millis() - moisture_last_reading > kMoistureTimeDelta) {
     // Connect electrodes to perform measurement.
